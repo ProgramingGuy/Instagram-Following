@@ -203,7 +203,7 @@ async function collectNonFollowers() {
     }
   }
 
-  console.log(`\n📌 Found ${usersNotFollowingBack.length} users who don’t follow back.\n`);
+  console.log(`\n Found ${usersNotFollowingBack.length} users who don’t follow back.\n`);
 }
 
 // === Phase 2: Unfollow them ===
@@ -237,7 +237,7 @@ async function unfollowNonFollowers() {
     }
   }
 
-  console.log("✅ All unfollows complete!");
+  console.log("All unfollows complete!");
 }
 
 // === Run both phases ===

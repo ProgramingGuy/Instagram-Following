@@ -333,3 +333,132 @@ async function unfollowUsers(userIds) {
   console.log(`Unfollowed ${users.length} users.`);
 })();
 ```
+# List Generator for possible bots that follow you and profiles you can't view.
+
+```javascript
+// Utility to get a cookie by name
+function getCookie(name) {
+  const cookies = `; ${document.cookie}`;
+  const parts = cookies.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+// Utility to sleep for a given number of milliseconds
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Generate the next page URL for fetching followers
+function generateNextPageUrl(after) {
+  return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+    id: ds_user_id,
+    include_reel: true,
+    fetch_mutual: false,
+    first: 24,
+    after: after
+  }))}`;
+}
+
+// Initialize variables
+const csrftoken = getCookie("csrftoken");
+const ds_user_id = getCookie("ds_user_id");
+
+let initialURL = `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+  id: ds_user_id,
+  include_reel: true,
+  fetch_mutual: false,
+  first: 24
+}))}`;
+
+let totalFollowing = null;
+let doNext = true;
+let possibleBots = [];
+let privateFollowers = [];
+let fetchedCount = 0;
+let sleepCycle = 0;
+
+// Main script function
+async function startScript() {
+  while (doNext) {
+    let responseJson;
+    try {
+      const response = await fetch(initialURL);
+      responseJson = await response.json();
+    } catch (error) {
+      console.error("Fetch failed, retrying...", error);
+      continue;
+    }
+
+    const userData = responseJson?.data?.user;
+    if (!userData) {
+      console.error("User data not found in response.");
+      break;
+    }
+
+    if (!totalFollowing) {
+      totalFollowing = userData.edge_follow.count;
+    }
+
+    const pageInfo = userData.edge_follow.page_info;
+    doNext = pageInfo.has_next_page;
+    initialURL = generateNextPageUrl(pageInfo.end_cursor);
+
+    const edges = userData.edge_follow.edges;
+    fetchedCount += edges.length;
+
+    for (const { node } of edges) {
+      const postCount = node.edge_owner_to_timeline_media?.count ?? 0;
+
+      // Add to possible bot list (any user with 3 or fewer posts)
+      if (postCount <= 3) {
+        possibleBots.push({ username: node.username, id: node.id, posts: postCount });
+      }
+
+      // Add to private followers list (private + follows you)
+      if (node.is_private && node.follows_viewer) {
+        privateFollowers.push({ username: node.username, id: node.id });
+      }
+    }
+
+    // Log progress
+    console.clear();
+    console.log(`Progress: ${fetchedCount}/${totalFollowing} (${Math.round(100 * fetchedCount / totalFollowing)}%)`);
+
+    console.log("\nPossible Bots (≤3 posts):");
+    possibleBots.forEach(user => {
+      console.log(`Username: ${user.username}, ID: ${user.id}, Posts: ${user.posts}`);
+    });
+
+    console.log("\nPrivate Followers (private + follows you):");
+    privateFollowers.forEach(user => {
+      console.log(`Username: ${user.username}, ID: ${user.id}`);
+    });
+
+    // Sleep to avoid rate limits
+    await sleep(Math.floor(400 * Math.random()) + 1000);
+    sleepCycle++;
+
+    if (sleepCycle > 6) {
+      console.log("Sleeping to avoid Instagram block...");
+      await sleep(10000);
+      sleepCycle = 0;
+    }
+  }
+
+  // Save results as JSON files
+  const saveAsJson = (data, filename) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  };
+
+  saveAsJson(possibleBots, "IG_PossibleBots.json");
+  saveAsJson(privateFollowers, "IG_PrivateFollowers.json");
+
+  console.log("Script completed. Data saved.");
+}
+
+startScript();
+```

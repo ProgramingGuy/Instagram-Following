@@ -4,6 +4,7 @@
 
 ------------ COPY CODE BELOW ------------
 
+<pre> <code>
 // Utility to get a cookie by name
 function getCookie(name) {
   const cookies = `; ${document.cookie}`;
@@ -108,3 +109,4 @@ async function startScript() {
 }
 
 startScript();
+</code> </pre>

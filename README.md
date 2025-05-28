@@ -333,7 +333,9 @@ async function unfollowUsers(userIds) {
   console.log(`Unfollowed ${users.length} users.`);
 })();
 ```
-# List Generator for possible bots that follow you and profiles you can't view.
+
+# Possible bot list / Private accounts.
+List Generator for possible bots that follow you and profiles you can't view.
 
 ```javascript
 // Utility to get a cookie by name
@@ -411,12 +413,23 @@ async function startScript() {
 
       // Add to possible bot list (any user with 3 or fewer posts)
       if (postCount <= 3) {
-        possibleBots.push({ username: node.username, id: node.id, posts: postCount });
+        possibleBots.push({
+          username: node.username,
+          id: node.id,
+          posts: postCount,
+          is_private: node.is_private,
+          follows_viewer: node.follows_viewer
+        });
       }
 
       // Add to private followers list (private + follows you)
       if (node.is_private && node.follows_viewer) {
-        privateFollowers.push({ username: node.username, id: node.id });
+        privateFollowers.push({
+          username: node.username,
+          id: node.id,
+          is_private: true,
+          follows_viewer: true
+        });
       }
     }
 
@@ -426,12 +439,12 @@ async function startScript() {
 
     console.log("\nPossible Bots (≤3 posts):");
     possibleBots.forEach(user => {
-      console.log(`Username: ${user.username}, ID: ${user.id}, Posts: ${user.posts}`);
+      console.log(`Username: ${user.username}, ID: ${user.id}, Posts: ${user.posts}, Private: ${user.is_private}, Follows you: ${user.follows_viewer}`);
     });
 
     console.log("\nPrivate Followers (private + follows you):");
     privateFollowers.forEach(user => {
-      console.log(`Username: ${user.username}, ID: ${user.id}`);
+      console.log(`Username: ${user.username}, ID: ${user.id}, Private: ${user.is_private}, Follows you: ${user.follows_viewer}`);
     });
 
     // Sleep to avoid rate limits

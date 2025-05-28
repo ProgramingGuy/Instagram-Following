@@ -1,76 +1,108 @@
-# Instagram-Following
-Generates a list of people not following back for Instagram for removal.
+// # Instagram-Following
+// Generates a list of people not following back for Instagram for removal.
+// Paste code into DEV console in chrome while logged into your account on your profile page, it'll run and log an array of users.
 
-
-function getCookie(b) {
-  let c = `; ${document.cookie}`, a = c.split(`; ${b}=`);
-  if (2 === a.length) return a.pop().split(";").shift();
+// Utility to get a cookie by name
+function getCookie(name) {
+  const cookies = `; ${document.cookie}`;
+  const parts = cookies.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
 }
 
-function sleep(a) {
-  return new Promise(b => setTimeout(b, a));
+// Utility to sleep for a given number of milliseconds
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function afterUrlGenerator(a) {
-  return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24","after":"${a}"}`;
+// Generate the next page URL for fetching followers
+function generateNextPageUrl(after) {
+  return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+    id: ds_user_id,
+    include_reel: true,
+    fetch_mutual: false,
+    first: 24,
+    after: after
+  }))}`;
 }
 
-function unfollowUserUrlGenerator(a) {
-  return `https://www.instagram.com/web/friendships/${a}/unfollow/`;
-}
+// Initialize variables
+const csrftoken = getCookie("csrftoken");
+const ds_user_id = getCookie("ds_user_id");
 
-let followedPeople,
-  csrftoken = getCookie("csrftoken"),
-  ds_user_id = getCookie("ds_user_id"),
-  initialURL = `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables={"id":"${ds_user_id}","include_reel":"true","fetch_mutual":"false","first":"24"}`,
-  doNext = !0,
-  filteredList = [],
-  getUnfollowCounter = 0,
-  scrollCicle = 0;
+let initialURL = `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+  id: ds_user_id,
+  include_reel: true,
+  fetch_mutual: false,
+  first: 24
+}))}`;
 
+let totalFollowing = null;
+let doNext = true;
+let usersNotFollowingBack = [];
+let fetchedCount = 0;
+let sleepCycle = 0;
+
+// Main script function
 async function startScript() {
-  for (var c, d, e, b, f, g = Math.floor; doNext;) {
-    let a;
+  while (doNext) {
+    let responseJson;
     try {
-      a = await fetch(initialURL).then(a => a.json());
-    } catch (h) {
+      const response = await fetch(initialURL);
+      responseJson = await response.json();
+    } catch (error) {
+      console.error("Fetch failed, retrying...", error);
       continue;
     }
 
-    followedPeople || (followedPeople = a.data.user.edge_follow.count);
-    doNext = a.data.user.edge_follow.page_info.has_next_page;
-    initialURL = afterUrlGenerator(a.data.user.edge_follow.page_info.end_cursor);
-    getUnfollowCounter += a.data.user.edge_follow.edges.length;
+    const userData = responseJson?.data?.user;
+    if (!userData) {
+      console.error("User data not found in response.");
+      break;
+    }
 
-    a.data.user.edge_follow.edges.forEach(a => {
-      if (!a.node.follows_viewer) {
-        filteredList.push(a.node);
+    if (!totalFollowing) {
+      totalFollowing = userData.edge_follow.count;
+    }
+
+    const pageInfo = userData.edge_follow.page_info;
+    doNext = pageInfo.has_next_page;
+    initialURL = generateNextPageUrl(pageInfo.end_cursor);
+
+    const edges = userData.edge_follow.edges;
+    fetchedCount += edges.length;
+
+    for (const { node } of edges) {
+      if (!node.follows_viewer) {
+        usersNotFollowingBack.push({ username: node.username, id: node.id });
       }
-    });
+    }
 
+    // Log progress
     console.clear();
-    console.log(`Progress: ${getUnfollowCounter}/${followedPeople} (${parseInt(100 * (getUnfollowCounter / followedPeople))}%)`);
-    filteredList.forEach(a => {
-      console.log(`Username: ${a.username}, ID: ${a.id}`);
+    console.log(`Progress: ${fetchedCount}/${totalFollowing} (${Math.round(100 * fetchedCount / totalFollowing)}%)`);
+    usersNotFollowingBack.forEach(user => {
+      console.log(`Username: ${user.username}, ID: ${user.id}`);
     });
 
-    await sleep(g(400 * Math.random()) + 1000);
-    scrollCicle++;
-    if (scrollCicle > 6) {
-      scrollCicle = 0;
+    // Sleep to avoid rate limits
+    await sleep(Math.floor(400 * Math.random()) + 1000);
+    sleepCycle++;
+
+    if (sleepCycle > 6) {
+      console.log("Sleeping 10 seconds to avoid instagram block...");
       await sleep(10000);
+      sleepCycle = 0;
     }
   }
 
-  c = JSON.stringify(filteredList);
-  d = "usersNotFollowingBack.json";
-  e = "application/json";
-  b = document.createElement("a");
-  f = new Blob([c], { type: e });
-  b.href = URL.createObjectURL(f);
-  b.download = d;
-  b.click();
-  console.log("All DONE!");
+  // Save results as a JSON file
+  const blob = new Blob([JSON.stringify(usersNotFollowingBack, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "IG_NotFollowingBack.json";
+  link.click();
+
+  console.log("Script ran, data stored in array.");
 }
 
 startScript();

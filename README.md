@@ -110,6 +110,7 @@ startScript();
 ```
 
 # Logs everyone and removes them automaticlly.
+*Removes people who don't follow you back.*
 This will take a long time due to Instagram throttling, may be more efficent to manually remove everyone via the list.
 
 ```javascript

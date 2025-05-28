@@ -90,7 +90,7 @@ async function startScript() {
     sleepCycle++;
 
     if (sleepCycle > 6) {
-      console.log("Sleeping 10 seconds to avoid instagram block...");
+      console.log("Sleeping to avoid instagram block...");
       await sleep(10000);
       sleepCycle = 0;
     }

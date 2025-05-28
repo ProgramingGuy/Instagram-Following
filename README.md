@@ -248,3 +248,87 @@ async function runUnfollowScript() {
 
 runUnfollowScript();
 ```
+# Unfollow Everyone
+Just a basic script to unfollow everyone, it will take some time to run. May need to sit overnight.
+
+```Javascript
+// Helper to get cookie by name
+const getCookie = name => {
+  const c = `; ${document.cookie}`;
+  const parts = c.split(`; ${name}=`);
+  return parts.length === 2 ? parts.pop().split(';')[0] : null;
+};
+
+// Sleep helper
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+const csrftoken = getCookie("csrftoken");
+const ds_user_id = getCookie("ds_user_id");
+
+// Fetch all followees recursively
+async function fetchFollowees(after = null, acc = []) {
+  const variables = {
+    id: ds_user_id,
+    include_reel: true,
+    fetch_mutual: false,
+    first: 24,
+    after: after
+  };
+
+  const url = `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify(variables))}`;
+
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    const edges = json?.data?.user?.edge_follow?.edges || [];
+    const pageInfo = json?.data?.user?.edge_follow?.page_info;
+
+    acc.push(...edges.map(e => e.node.id));
+
+    if (pageInfo?.has_next_page) {
+      await sleep(1000);
+      return fetchFollowees(pageInfo.end_cursor, acc);
+    }
+  } catch (err) {
+    console.error("Fetch error:", err);
+  }
+
+  return acc;
+}
+
+// Unfollow users with delay and cooldowns
+async function unfollowUsers(userIds) {
+  for (let i = 0; i < userIds.length; i++) {
+    const id = userIds[i];
+
+    try {
+      await fetch(`https://www.instagram.com/web/friendships/${id}/unfollow/`, {
+        method: "POST",
+        headers: { "x-csrftoken": csrftoken },
+        credentials: "include"
+      });
+    } catch (err) {
+      console.error(`Failed to unfollow user ${id}:`, err);
+    }
+
+    await sleep(2000); // 2 sec between unfollows
+
+    // Pause every 10 unfollows
+    if ((i + 1) % 10 === 0) {
+      console.log(`Pausing for 5 minutes after ${i + 1} unfollows...`);
+      await sleep(5 * 60 * 1000);
+    }
+  }
+}
+
+// Main execution
+(async () => {
+  const users = await fetchFollowees();
+  if (users.length === 0) {
+    console.log("No users to unfollow.");
+    return;
+  }
+  await unfollowUsers(users);
+  console.log(`Unfollowed ${users.length} users.`);
+})();
+```

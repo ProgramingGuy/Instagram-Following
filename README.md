@@ -2,8 +2,7 @@
 Generates a list of people not following back for Instagram.
 Just paste code into DEV console in chrome while logged into your account on your profile page, it'll run and log an array of users.
 
-<pre> <code>
-  ```javascript
+```javascript
 // Utility to get a cookie by name
 function getCookie(name) {
   const cookies = `; ${document.cookie}`;
@@ -108,5 +107,4 @@ async function startScript() {
 }
 
 startScript();
-  ```
-</code> </pre>
+```

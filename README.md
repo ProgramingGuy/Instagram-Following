@@ -108,3 +108,143 @@ async function startScript() {
 
 startScript();
 ```
+
+# Logs everyone and removes them automaticlly.
+This will take a long time due to Instagram throttling.
+
+```javascript
+// === Helper Functions ===
+function getCookie(name) {
+  const cookies = `; ${document.cookie}`;
+  const parts = cookies.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function generateNextPageUrl(after) {
+  return `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+    id: ds_user_id,
+    include_reel: true,
+    fetch_mutual: false,
+    first: 24,
+    after: after
+  }))}`;
+}
+
+function unfollowUserUrl(id) {
+  return `https://www.instagram.com/web/friendships/${id}/unfollow/`;
+}
+
+// === Main Script ===
+const csrftoken = getCookie("csrftoken");
+const ds_user_id = getCookie("ds_user_id");
+
+let initialURL = `https://www.instagram.com/graphql/query/?query_hash=3dec7e2c57367ef3da3d987d89f9dbc8&variables=${encodeURIComponent(JSON.stringify({
+  id: ds_user_id,
+  include_reel: true,
+  fetch_mutual: false,
+  first: 24
+}))}`;
+
+let totalFollowing = null;
+let doNext = true;
+let usersNotFollowingBack = [];
+let fetchedCount = 0;
+let sleepCycle = 0;
+
+// === Phase 1: Collect users who don't follow back ===
+async function collectNonFollowers() {
+  while (doNext) {
+    let responseJson;
+    try {
+      const response = await fetch(initialURL);
+      responseJson = await response.json();
+    } catch (error) {
+      console.error("Fetch failed, retrying...", error);
+      continue;
+    }
+
+    const userData = responseJson?.data?.user;
+    if (!userData) {
+      console.error("User data not found in response.");
+      break;
+    }
+
+    if (!totalFollowing) totalFollowing = userData.edge_follow.count;
+
+    const pageInfo = userData.edge_follow.page_info;
+    doNext = pageInfo.has_next_page;
+    initialURL = generateNextPageUrl(pageInfo.end_cursor);
+
+    const edges = userData.edge_follow.edges;
+    fetchedCount += edges.length;
+
+    for (const { node } of edges) {
+      if (!node.follows_viewer) {
+        usersNotFollowingBack.push({ username: node.username, id: node.id });
+      }
+    }
+
+    console.clear();
+    console.log(`Progress: ${fetchedCount}/${totalFollowing} (${Math.round(100 * fetchedCount / totalFollowing)}%)`);
+    usersNotFollowingBack.forEach(user => {
+      console.log(`Username: ${user.username}, ID: ${user.id}`);
+    });
+
+    await sleep(Math.floor(400 * Math.random()) + 1000);
+    sleepCycle++;
+    if (sleepCycle > 6) {
+      console.log("Sleeping 10 seconds to avoid temp block...");
+      await sleep(10000);
+      sleepCycle = 0;
+    }
+  }
+
+  console.log(`\n📌 Found ${usersNotFollowingBack.length} users who don’t follow back.\n`);
+}
+
+// === Phase 2: Unfollow them ===
+async function unfollowNonFollowers() {
+  let totalUnfollowed = 0;
+  let pauseCounter = 0;
+
+  for (const user of usersNotFollowingBack) {
+    try {
+      await fetch(unfollowUserUrl(user.id), {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "x-csrftoken": csrftoken
+        },
+        mode: "cors",
+        credentials: "include"
+      });
+    } catch (error) {
+      console.error(`Error unfollowing ${user.username}:`, error);
+      continue;
+    }
+
+    console.log(`Unfollowed: ${user.username} (${++totalUnfollowed}/${usersNotFollowingBack.length})`);
+
+    await sleep(Math.floor(2000 * Math.random()) + 4000); // 4–6 sec delay
+    if (++pauseCounter >= 5) {
+      console.log("Sleeping 5 minutes to avoid temp block...");
+      pauseCounter = 0;
+      await sleep(5 * 60 * 1000);
+    }
+  }
+
+  console.log("✅ All unfollows complete!");
+}
+
+// === Run both phases ===
+async function runUnfollowScript() {
+  await collectNonFollowers();
+  await unfollowNonFollowers();
+}
+
+runUnfollowScript();
+```

@@ -1,8 +1,6 @@
-// # Instagram-Following
-// Generates a list of people not following back for Instagram for removal.
-// Paste code into DEV console in chrome while logged into your account on your profile page, it'll run and log an array of users.
-
------------- COPY CODE BELOW ------------
+# Instagram-
+Generates a list of people not following back for Instagram for removal.
+Just paste code into DEV console in chrome while logged into your account on your profile page, it'll run and log an array of users.
 
 <pre> <code>
 // Utility to get a cookie by name

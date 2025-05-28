@@ -2,6 +2,8 @@
 // Generates a list of people not following back for Instagram for removal.
 // Paste code into DEV console in chrome while logged into your account on your profile page, it'll run and log an array of users.
 
+------------ COPY CODE BELOW ------------
+
 // Utility to get a cookie by name
 function getCookie(name) {
   const cookies = `; ${document.cookie}`;

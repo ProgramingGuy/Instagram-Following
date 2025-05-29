@@ -475,3 +475,116 @@ async function startScript() {
 
 startScript();
 ```
+
+# Auto like posts on profile
+Will take a while to run it has to slowly like posts like a human so IG won't throttle your account.
+
+```javascript
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function likeCurrentPost() {
+  await sleep(800);
+
+  let likeButton = [...document.querySelectorAll('svg[aria-label]')]
+    .find(svg => svg.getAttribute('aria-label') === 'Like' || svg.getAttribute('aria-label') === 'Unlike');
+
+  if (!likeButton) {
+    // fallback: click coordinate (630, 400)
+    const el = document.elementFromPoint(630, 400);
+    if (el) {
+      el.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: 630,
+        clientY: 400
+      }));
+      console.log('Clicked like button at coordinate 630x400');
+      await sleep(1500);
+      return;
+    } else {
+      console.log('Like button not found and no element at coordinate');
+      return;
+    }
+  }
+
+  if (likeButton.getAttribute('aria-label') === 'Like') {
+    likeButton.parentElement.click();
+    console.log('Post liked!');
+    await sleep(1500);
+  } else {
+    console.log('Post already liked.');
+  }
+}
+
+async function closeModal() {
+  document.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'Escape',
+    keyCode: 27,
+    code: 'Escape',
+    bubbles: true,
+  }));
+  await sleep(1000);
+}
+
+function getAllPosts() {
+  return Array.from(document.querySelectorAll('a'))
+    .filter(a => a.href.match(/\/(p|reel)\//));
+}
+
+async function likeAllPostsWithBatchScroll(batchSize = 6) {
+  const processedPosts = new Set();
+  let noNewPostsCounter = 0;
+
+  while (true) {
+    // Get all posts currently loaded
+    const posts = getAllPosts();
+    // Filter out posts already processed
+    const newPosts = posts.filter(p => !processedPosts.has(p.href));
+
+    if (newPosts.length === 0) {
+      noNewPostsCounter++;
+      if (noNewPostsCounter >= 3) {
+        console.log('No new posts loaded after scrolling. Ending script.');
+        break;
+      }
+    } else {
+      noNewPostsCounter = 0; // reset if found new posts
+    }
+
+    // Process posts in batches
+    for (let i = 0; i < newPosts.length; i += batchSize) {
+      const batch = newPosts.slice(i, i + batchSize);
+
+      for (const post of batch) {
+        processedPosts.add(post.href);
+        console.log(`Opening post: ${post.href}`);
+        post.click();
+        await sleep(1000);
+
+        await likeCurrentPost();
+        await closeModal();
+
+        await sleep(1000);
+      }
+
+      // Scroll after each batch except last batch if no more posts
+      if (i + batchSize < newPosts.length || noNewPostsCounter < 3) {
+        window.scrollBy(0, window.innerHeight);
+        console.log('Scrolled down after batch of posts.');
+        await sleep(2000);
+      }
+    }
+
+    // Small scroll if no new posts or after batch to load more posts
+    window.scrollBy(0, window.innerHeight);
+    await sleep(2000);
+  }
+
+  console.log('All posts processed.');
+}
+
+likeAllPostsWithBatchScroll(6);
+```
